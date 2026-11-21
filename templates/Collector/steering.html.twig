@@ -1,0 +1,110 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% macro icon() %}
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 3v7M5 17l5.5-3.5M19 17l-5.5-3.5"/></svg>
+{% endmacro %}
+
+{% block toolbar %}
+    {% if collector.runs is not empty or collector.hub %}
+        {% set hub_failed = collector.hub and collector.hub.state == 'failed' %}
+        {% set icon %}
+            {{ _self.icon() }}
+            <span class="sf-toolbar-value">{{ collector.steeredCount }}</span>
+            <span class="sf-toolbar-label">/ {{ collector.runs|length }} steered</span>
+        {% endset %}
+        {% set text %}
+            <div class="sf-toolbar-info-piece">
+                <b>Agent runs</b>
+                <span>{{ collector.runs|length }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Steered</b>
+                <span>{{ collector.steeredCount }}</span>
+            </div>
+            {% if collector.hub %}
+                <div class="sf-toolbar-info-piece">
+                    <b>Hub</b>
+                    <span class="sf-toolbar-status {{ hub_failed ? 'sf-toolbar-status-red' }}">{{ collector.hub.state ?? 'not read' }}</span>
+                </div>
+            {% endif %}
+        {% endset %}
+
+        {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: profiler_url, status: hub_failed ? 'red' : ''}) }}
+    {% endif %}
+{% endblock %}
+
+{% block menu %}
+    <span class="label {{ collector.runs is empty and not collector.hub ? 'disabled' }} {{ collector.hub and collector.hub.state == 'failed' ? 'label-status-error' }}">
+        <span class="icon">{{ _self.icon() }}</span>
+        <strong>AI steering</strong>
+        {% if collector.steeredCount %}
+            <span class="count"><span>{{ collector.steeredCount }}</span></span>
+        {% endif %}
+    </span>
+{% endblock %}
+
+{% block panel %}
+    <h2>AI steering</h2>
+
+    <h3>Hub</h3>
+    {% if collector.hub %}
+        <table>
+            <tr><th>Url</th><td>{{ collector.hub.url }}</td></tr>
+            <tr><th>State</th><td>{{ collector.hub.state ?? 'not read during this request' }}</td></tr>
+            {% if collector.hub.error %}
+                <tr class="status-error"><th>Error</th><td>{{ collector.hub.error }}</td></tr>
+                <tr><th>Fallback</th><td>{{ collector.hub.fallback ? 'last configuration received' : 'none, the bundle configuration applies' }}</td></tr>
+            {% endif %}
+        </table>
+    {% else %}
+        <div class="empty"><p>No hub configured: only the bundle configuration applies.</p></div>
+    {% endif %}
+
+    <h3>Agent runs</h3>
+    {% if collector.runs is empty %}
+        <div class="empty empty-panel">
+            <p>No agent ran with the steering input processor.</p>
+        </div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th>Source</th>
+                    <th>Model</th>
+                    <th>Experiment</th>
+                    <th>Prompt</th>
+                    <th>Options</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in collector.runs %}
+                    <tr>
+                        <td class="font-normal">
+                            {{ run.agent }}
+                            <br><span class="text-small text-muted">{{ run.conversation_id }}</span>
+                        </td>
+                        <td>{{ run.source ?? 'not steered' }}</td>
+                        <td class="nowrap">
+                            {% if run.model and run.model != run.requested_model %}
+                                <del class="text-muted">{{ run.requested_model }}</del> {{ run.model }}
+                            {% else %}
+                                {{ run.requested_model }}
+                            {% endif %}
+                        </td>
+                        <td>{{ run.experiment ? run.experiment ~ ' / ' ~ run.variant : '-' }}</td>
+                        <td>
+                            {% if run.system_prompt is not null %}
+                                <details>
+                                    <summary>{{ run.prompt_version ? 'version ' ~ run.prompt_version : 'imposed' }}</summary>
+                                    <pre class="break-long-words" style="white-space: pre-wrap">{{ run.system_prompt }}</pre>
+                                </details>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td><code>{{ run.options is empty ? '-' : run.options|json_encode }}</code></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,63 @@
+{
+    "name": "quentinrogeret34/ai-steering-bundle",
+    "description": "Steering for Symfony AI agents: model, system prompt and options imposed per agent, A/B tests, from the configuration or a hub",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "symfony",
+        "ai",
+        "llm",
+        "agent",
+        "prompt-management",
+        "ab-testing"
+    ],
+    "require": {
+        "php": ">=8.2",
+        "psr/cache": "^2.0|^3.0",
+        "psr/log": "^2.0|^3.0",
+        "symfony/ai-agent": "^1.0@beta",
+        "symfony/ai-platform": "^1.0@beta",
+        "symfony/config": "^7.3|^8.0",
+        "symfony/dependency-injection": "^7.3|^8.0",
+        "symfony/http-client": "^7.3|^8.0",
+        "symfony/http-kernel": "^7.3|^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5",
+        "quentinrogeret34/ai-observability-bundle": "dev-main",
+        "symfony/browser-kit": "^7.3|^8.0",
+        "symfony/css-selector": "^7.3|^8.0",
+        "symfony/framework-bundle": "^7.3|^8.0",
+        "symfony/twig-bundle": "^7.3|^8.0",
+        "symfony/web-profiler-bundle": "^7.3|^8.0"
+    },
+    "suggest": {
+        "quentinrogeret34/ai-observability-bundle": "To tag the invoke_agent span with the experiment, the variant and the prompt version",
+        "symfony/web-profiler-bundle": "To see what the steering changed on each agent run in the profiler"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:quentinRogeret34/ai-observability-bundle.git"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "AiSteering\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AiSteering\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "beta",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "tbachert/spi": true
+        }
+    }
+}
