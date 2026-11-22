@@ -41,6 +41,7 @@ final class AiSteeringBundle extends AbstractBundle
                 ->arrayNode('experiments')
                     ->info('A/B tests keyed by experiment id. Each conversation gets one variant, which may change the system prompt, the model and the options.')
                     ->useAttributeAsKey('id')
+                    ->normalizeKeys(false)
                     ->arrayPrototype()
                         ->children()
                             ->scalarNode('agent')
@@ -52,6 +53,7 @@ final class AiSteeringBundle extends AbstractBundle
                                 ->isRequired()
                                 ->requiresAtLeastOneElement()
                                 ->useAttributeAsKey('name')
+                                ->normalizeKeys(false)
                                 ->arrayPrototype()
                                     ->children()
                                         ->integerNode('weight')->defaultValue(1)->min(0)->end()
@@ -128,6 +130,7 @@ final class AiSteeringBundle extends AbstractBundle
 
         $services->set('ai_steering.data_collector', SteeringDataCollector::class)
             ->args([$hub])
-            ->tag('data_collector', ['id' => SteeringDataCollector::NAME, 'template' => SteeringDataCollector::TEMPLATE]);
+            ->tag('data_collector', ['id' => SteeringDataCollector::NAME, 'template' => SteeringDataCollector::TEMPLATE])
+            ->tag('kernel.reset', ['method' => 'reset']);
     }
 }

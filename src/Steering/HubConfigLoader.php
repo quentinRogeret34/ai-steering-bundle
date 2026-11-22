@@ -20,12 +20,14 @@ final class HubConfigLoader implements ResetInterface
     public const STATE_NOT_MODIFIED = 'not_modified';
     public const STATE_FAILED = 'failed';
 
-    private const CACHE_KEY = 'ai_steering.hub_config';
-    private const LAST_KNOWN_KEY = 'ai_steering.hub_config.last_known';
+    private const CACHE_KEY_PREFIX = 'ai_steering.hub_config.';
     private const RETRY_AFTER = 10;
 
     /** @var array{state: self::STATE_*, error: ?string, fallback: bool}|null */
     private ?array $status = null;
+
+    private ?SteeringConfig $loaded = null;
+    private bool $hasLoaded = false;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -45,23 +47,38 @@ final class HubConfigLoader implements ResetInterface
             return null;
         }
 
-        $item = $this->cache->getItem(self::CACHE_KEY);
-
-        if ($item->isHit()) {
+        if ($this->hasLoaded) {
             $this->status = ['state' => self::STATE_CACHED, 'error' => null, 'fallback' => false];
 
-            return $this->parse($item->get());
+            return $this->loaded;
         }
 
-        $lastKnown = $this->cache->getItem(self::LAST_KNOWN_KEY);
-        /** @var array{etag: ?string, config: array<mixed>}|null $last */
-        $last = $lastKnown->isHit() ? $lastKnown->get() : null;
+        $cacheKey = $this->cacheKey();
+        $item = $this->cache->getItem($cacheKey);
+
+        if ($item->isHit()) {
+            try {
+                $this->loaded = $this->parse($item->get());
+                $this->hasLoaded = true;
+                $this->status = ['state' => self::STATE_CACHED, 'error' => null, 'fallback' => false];
+
+                return $this->loaded;
+            } catch (\Throwable $exception) {
+                $this->logger?->warning('The cached AI hub configuration could not be parsed and will be refreshed: {message}', ['message' => $exception->getMessage(), 'exception' => $exception]);
+            }
+        }
+
+        $lastKnown = $this->cache->getItem($cacheKey.'.last_known');
+        $last = $this->validCachedPayload($lastKnown->isHit() ? $lastKnown->get() : null);
 
         try {
             $config = $this->fetch($last);
-            $this->status = ['state' => $config === $last ? self::STATE_NOT_MODIFIED : self::STATE_FETCHED, 'error' => null, 'fallback' => false];
-            $lastKnown->set($config);
-            $this->cache->save($lastKnown);
+            $notModified = $config === $last;
+            $this->status = ['state' => $notModified ? self::STATE_NOT_MODIFIED : self::STATE_FETCHED, 'error' => null, 'fallback' => false];
+            if (!$notModified) {
+                $lastKnown->set($config);
+                $this->cache->save($lastKnown);
+            }
             $item->expiresAfter($this->ttl);
         } catch (\Throwable $exception) {
             $this->logger?->warning('The AI hub configuration could not be loaded, the last one received is kept: {message}', ['message' => $exception->getMessage(), 'exception' => $exception]);
@@ -73,7 +90,16 @@ final class HubConfigLoader implements ResetInterface
         $item->set($config);
         $this->cache->save($item);
 
-        return $this->parse($config);
+        try {
+            $this->loaded = $this->parse($config);
+        } catch (\Throwable $exception) {
+            $this->logger?->warning('The fallback AI hub configuration could not be parsed: {message}', ['message' => $exception->getMessage(), 'exception' => $exception]);
+            $this->loaded = null;
+        }
+
+        $this->hasLoaded = true;
+
+        return $this->loaded;
     }
 
     /**
@@ -95,6 +121,13 @@ final class HubConfigLoader implements ResetInterface
     public function reset(): void
     {
         $this->status = null;
+        $this->loaded = null;
+        $this->hasLoaded = false;
+    }
+
+    public function cacheKey(): string
+    {
+        return self::CACHE_KEY_PREFIX.hash('xxh3', rtrim(trim($this->url), '/'));
     }
 
     /**
@@ -129,10 +162,30 @@ final class HubConfigLoader implements ResetInterface
     }
 
     /**
-     * @param array{etag: ?string, config: array<mixed>}|null $cached
+     * @return array{etag: ?string, config: array<mixed>}|null
      */
-    private function parse(?array $cached): ?SteeringConfig
+    private function validCachedPayload(mixed $cached): ?array
     {
-        return null === $cached ? null : SteeringConfig::fromArray($cached['config']);
+        if (!\is_array($cached) || !\is_array($cached['config'] ?? null)) {
+            return null;
+        }
+
+        $etag = $cached['etag'] ?? null;
+
+        return ['etag' => \is_string($etag) ? $etag : null, 'config' => $cached['config']];
+    }
+
+    private function parse(mixed $cached): ?SteeringConfig
+    {
+        if (null === $cached) {
+            return null;
+        }
+
+        $payload = $this->validCachedPayload($cached);
+        if (null === $payload) {
+            throw new \InvalidArgumentException('Cached hub configuration has an unexpected shape.');
+        }
+
+        return SteeringConfig::fromArray($payload['config']);
     }
 }

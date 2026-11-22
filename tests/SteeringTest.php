@@ -99,7 +99,8 @@ final class SteeringTest extends TestCase
         }, $cache);
 
         $loader->load();
-        $cache->deleteItem('ai_steering.hub_config');
+        $cache->deleteItem($loader->cacheKey());
+        $loader->reset();
 
         self::assertSame('gpt-hub', $loader->load()->resolve('booking', 'c1')->settings->model);
         self::assertSame(['state' => HubConfigLoader::STATE_FAILED, 'error' => 'Connection refused.', 'fallback' => true], $loader->status());
@@ -137,10 +138,34 @@ final class SteeringTest extends TestCase
         }, $cache);
 
         $loader->load();
-        $cache->deleteItem('ai_steering.hub_config');
+        $cache->deleteItem($loader->cacheKey());
+        $loader->reset();
 
         self::assertSame('gpt-hub', $loader->load()->resolve('booking', 'c1')->settings->model);
         self::assertSame(HubConfigLoader::STATE_NOT_MODIFIED, $loader->status()['state']);
+    }
+
+    public function testCorruptedCacheEntryIsRefreshedWithoutFailing(): void
+    {
+        $cache = new ArrayAdapter();
+        $loader = $this->loader(static fn (): JsonMockResponse => new JsonMockResponse(self::HUB_CONFIG), $cache);
+
+        $corrupted = $cache->getItem($loader->cacheKey());
+        $corrupted->set('not-a-valid-payload');
+        $cache->save($corrupted);
+
+        self::assertSame('gpt-hub', $loader->load()->resolve('booking', 'c1')->settings->model);
+        self::assertSame(HubConfigLoader::STATE_FETCHED, $loader->status()['state']);
+    }
+
+    public function testCacheKeysAreScopedPerHubUrl(): void
+    {
+        $cache = new ArrayAdapter();
+        $loaderA = new HubConfigLoader(new MockHttpClient(static fn (): JsonMockResponse => new JsonMockResponse(['agents' => ['booking' => ['model' => 'gpt-a']], 'experiments' => []])), $cache, 'https://hub-a.test/', null);
+        $loaderB = new HubConfigLoader(new MockHttpClient(static fn (): JsonMockResponse => new JsonMockResponse(['agents' => ['booking' => ['model' => 'gpt-b']], 'experiments' => []])), $cache, 'https://hub-b.test/', null);
+
+        self::assertSame('gpt-a', $loaderA->load()->resolve('booking', 'c1')->settings->model);
+        self::assertSame('gpt-b', $loaderB->load()->resolve('booking', 'c1')->settings->model);
     }
 
     public function testEmptyHubUrlDisablesTheHub(): void

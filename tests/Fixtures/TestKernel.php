@@ -2,8 +2,8 @@
 
 namespace AiSteering\Tests\Fixtures;
 
-use AiObservability\AiObservabilityBundle;
 use AiObservability\Agent\TracedAgent;
+use AiObservability\AiObservabilityBundle;
 use AiSteering\AiSteeringBundle;
 use OpenTelemetry\SDK\Trace\SpanExporter\InMemoryExporter;
 use OpenTelemetry\SDK\Trace\SpanProcessor\SimpleSpanProcessor;

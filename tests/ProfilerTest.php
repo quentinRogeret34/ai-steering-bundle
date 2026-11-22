@@ -14,8 +14,8 @@ final class ProfilerTest extends WebTestCase
     {
         return new TestKernel([
             'agents' => ['booking' => ['model' => 'gpt-steered', 'system_prompt' => 'You book hotel rooms.', 'prompt_version' => 'v3']],
-            'experiments' => ['booking_tone' => ['agent' => 'booking', 'variants' => ['concise' => ['options' => ['max_tokens' => 50]]]]],
-            'hub' => ['url' => 'http://127.0.0.1:9/', 'timeout' => 0.1],
+            'experiments' => ['booking-tone' => ['agent' => 'booking', 'variants' => ['gpt-concise' => ['options' => ['max_tokens' => 50]]]]],
+            'hub' => ['url' => 'http://user:secret@127.0.0.1:9/', 'timeout' => 0.1],
         ], profiler: true);
     }
 
@@ -34,8 +34,9 @@ final class ProfilerTest extends WebTestCase
         self::assertSame('gpt-test', $run['requested_model']);
         self::assertSame('gpt-steered', $run['model']);
         self::assertSame(Resolution::SOURCE_CONFIG, $run['source']);
-        self::assertSame(['booking_tone', 'concise'], [$run['experiment'], $run['variant']]);
+        self::assertSame(['booking-tone', 'gpt-concise'], [$run['experiment'], $run['variant']]);
         self::assertSame(['max_tokens' => 50], $run['options']);
+        self::assertSame('http://***@127.0.0.1:9/', $collector->getHub()['url']);
         self::assertSame('failed', $collector->getHub()['state']);
         self::assertFalse($collector->getHub()['fallback']);
 
@@ -49,7 +50,8 @@ final class ProfilerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('#collector-content h2', 'AI steering');
-        self::assertSelectorTextContains('#collector-content', 'booking_tone / concise');
+        self::assertSelectorTextContains('#collector-content', 'booking-tone / gpt-concise');
         self::assertSelectorTextContains('#collector-content', 'version v3');
+        self::assertStringNotContainsString('user:secret', (string) $client->getResponse()->getContent());
     }
 }

@@ -50,8 +50,13 @@ final class SteeringDataCollector extends DataCollector implements LateDataColle
                 'experiment' => $run['resolution']?->experiment,
                 'variant' => $run['resolution']?->variant,
             ], $this->runs),
-            'hub' => null === $this->hub ? null : ['url' => $this->hub->getUrl()] + ($this->hub->status() ?? ['state' => null, 'error' => null, 'fallback' => false]),
+            'hub' => null === $this->hub ? null : ['url' => self::redactUrl($this->hub->getUrl())] + ($this->hub->status() ?? ['state' => null, 'error' => null, 'fallback' => false]),
         ];
+    }
+
+    private static function redactUrl(string $url): string
+    {
+        return (string) preg_replace('#^(https?://)[^/@]+@#i', '$1***@', $url);
     }
 
     public function getName(): string

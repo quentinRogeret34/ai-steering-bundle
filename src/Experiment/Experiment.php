@@ -10,6 +10,8 @@ use AiSteering\Steering\AgentSettings;
  */
 final readonly class Experiment
 {
+    private int $totalWeight;
+
     /**
      * @param non-empty-array<string, array{weight: int, settings: AgentSettings}> $variants
      */
@@ -18,7 +20,8 @@ final readonly class Experiment
         public string $agent,
         private array $variants,
     ) {
-        if (array_sum(array_column($variants, 'weight')) <= 0) {
+        $this->totalWeight = array_sum(array_column($variants, 'weight'));
+        if ($this->totalWeight <= 0) {
             throw new \InvalidArgumentException(\sprintf('The variants of experiment "%s" need a total weight above 0.', $id));
         }
     }
@@ -54,7 +57,7 @@ final readonly class Experiment
      */
     public function assign(string $key): string
     {
-        $point = hexdec(substr(hash('xxh3', $this->id.'|'.$key), 0, 8)) % array_sum(array_column($this->variants, 'weight'));
+        $point = hexdec(substr(hash('xxh3', $this->id.'|'.$key), 0, 8)) % $this->totalWeight;
 
         foreach ($this->variants as $name => $variant) {
             if ($point < $variant['weight']) {
